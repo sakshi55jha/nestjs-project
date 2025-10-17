@@ -16,6 +16,9 @@ export default function Page() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+    const API_URL = process.env.NEXT_PUBLIC_API_BASE;
+
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -26,7 +29,7 @@ export default function Page() {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:3001/api/auth/signup", form);
+      const res = await axios.post(`${API_URL}/api/auth/signup`, form);
       if (res.status === 201 || res.status === 200) {
         alert("Signup successful! Please login.");
         router.push("/auth/login");
