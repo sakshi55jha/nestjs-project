@@ -1,4 +1,3 @@
-// src/registration/registration.processor.ts
 import { Processor, Process } from '@nestjs/bull';
 import type { Job } from 'bull';
 import { Injectable, Logger } from '@nestjs/common';
@@ -11,25 +10,28 @@ export class RegistrationProcessor {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // process 'confirmation' jobs
   @Process('confirmation')
-  async handleConfirmation(job: Job<{ registrationId: number; userId: number; competitionId: number }>) {
+  async handleConfirmation(
+    job: Job<{ registrationId: number; userId: number; competitionId: number }>
+  ) {
     const { registrationId, userId, competitionId } = job.data;
-    this.logger.log(`Processing job ${job.id} for registration ${registrationId}`);
+    this.logger.log(`📦 [JOB RECEIVED] Job ID: ${job.id} | registrationId: ${registrationId} | userId: ${userId} | competitionId: ${competitionId}`);
 
     try {
-      // verify registration exists
+      // Step 1: Verify registration
       const registration = await this.prisma.registration.findUnique({
         where: { id: registrationId },
         include: { user: true, competition: true },
       });
       if (!registration) throw new Error('Registration not found');
+      this.logger.log(`✅ Registration found: ${JSON.stringify(registration)}`);
 
-      //verify competition still valid (deadline, capacity etc)
+      // Step 2: Verify competition
       const competition = registration.competition;
       if (!competition) throw new Error('Competition not found');
+      this.logger.log(`✅ Competition verified: ${competition.title}`);
 
-      // simulate sending confirmation — create MailBox row
+      // Step 3: Simulate sending confirmation email (store in MailBox)
       await this.prisma.mailBox.create({
         data: {
           userId,
@@ -39,10 +41,12 @@ export class RegistrationProcessor {
           sentAt: new Date(),
         },
       });
+      this.logger.log(`📨 Confirmation mail queued for ${registration.user.email}`);
 
-      this.logger.log(`Confirmation saved for registration ${registrationId}`);
+      this.logger.log(`🎉 [SUCCESS] Confirmation processed for registration ${registrationId}`);
     } catch (err: any) {
-      // write into FailedJob table for DLQ auditing
+      this.logger.error(`❌ [ERROR] Job ${job.id} failed: ${err?.message ?? err}`);
+
       try {
         await this.prisma.failedJob.create({
           data: {
@@ -52,11 +56,11 @@ export class RegistrationProcessor {
             createdAt: new Date(),
           },
         });
+        this.logger.log(`🪶 Logged failed job into FailedJob table`);
       } catch (e) {
-          this.logger.error(`Failed to write failedJob row: ${e?.message ?? e}`);
+        this.logger.error(`💥 Failed to write failedJob row: ${e?.message ?? e}`);
       }
 
-      this.logger.error(`Job ${job.id} failed: ${err?.message ?? err}`);
       throw err;
     }
   }
