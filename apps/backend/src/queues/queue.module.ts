@@ -6,11 +6,15 @@ import { PrismaService } from '../prisma.service';
 @Module({
   imports: [
     BullModule.registerQueue({
-      name: 'registration', // Queue name
-      redis: {
-        host: 'localhost',
-        port: 6379,
-      },
+      name: 'registration',
+      redis: process.env.NODE_ENV === 'production'
+        ? {
+          //@ts-ignore
+            url: process.env.REDIS_URL,
+            password: process.env.REDIS_TOKEN,
+            tls: {},
+          }
+        : { host: 'localhost', port: 6379 },
     }),
   ],
   providers: [RegistrationProcessor, PrismaService],
